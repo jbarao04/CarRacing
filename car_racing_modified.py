@@ -231,7 +231,8 @@ class CarRacing(gym.Env, EzPickle):
         self.domain_randomize = domain_randomize
         self.lap_complete_percent = lap_complete_percent
         self._init_colors()
-
+        self.prev_speed=0
+        self.prev_angle=0
         self.contactListener_keepref = FrictionDetector(self, self.lap_complete_percent)
         self.world = Box2D.b2World((0, 0), contactListener=self.contactListener_keepref)
         self.screen: Optional[pygame.Surface] = None
@@ -572,10 +573,22 @@ class CarRacing(gym.Env, EzPickle):
                 self.car.gas(0.2 * (action == 3))
                 self.car.brake(0.8 * (action == 4))
 
+
         self.car.step(1.0 / FPS)
         self.world.Step(1.0 / FPS, 6 * 30, 2 * 30)
         self.t += 1.0 / FPS
-
+        true_speed = np.sqrt(
+            np.square(self.car.hull.linearVelocity[0])
+            + np.square(self.car.hull.linearVelocity[1])
+        )
+        if true_speed>55:
+            self.reward -= 1
+        self.prev_speed=true_speed
+        angle = -self.car.hull.angle
+        print(angle-self.prev_angle)
+        if (angle-self.prev_angle)>0.1:
+            self.reward -= 1
+        self.prev_angle=angle
         self.state = self._render("state_pixels")
         step_reward = 0
         terminated = False
@@ -597,7 +610,7 @@ class CarRacing(gym.Env, EzPickle):
                 top = y1 + half_len
                 if left <= x <= right and bottom <= y <= top:
                     if self.contacts[i]==0:
-                        self.reward -=10
+                        self.reward -=100
                         self.contacts[i] = 1
                 else:
                     if self.contacts[i]==1:
